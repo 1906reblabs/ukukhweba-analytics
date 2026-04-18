@@ -1,0 +1,22 @@
+# Core scraping
+requests==2.31.0
+beautifulsoup4==4.12.2
+feedparser==6.0.11
+lxml==5.1.0
+
+# NLP — VADER is purpose-built for news sentiment, better than TextBlob
+vaderSentiment==3.3.2
+# Optional: FinBERT for financial-specific sentiment (heavier, GPU not needed)
+# transformers==4.38.0
+# torch==2.2.0
+
+# Data
+pandas==2.2.0
+python-dotenv==1.0.0
+
+# Supabase
+supabase==2.3.0
+
+# Utilities
+tenacity==8.2.3   # retry logic
+httpx==0.26.0     # async-capable HTTP
