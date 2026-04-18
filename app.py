@@ -93,3 +93,78 @@ st.info(
     "This is your proprietary signal that no one else has."
 )
 # Later: pull from Substack RSS or uploaded PDF
+
+# In your existing app.py — add this section
+from sentiment_engine.storage.supabase_client import (
+    get_ticker_sentiment_history,
+    get_top_movers_by_sentiment
+)
+import plotly.graph_objects as go
+from datetime import datetime
+
+def render_sentiment_section(selected_ticker: str):
+    st.subheader("📰 News Sentiment Signal")
+    st.caption("Proprietary · Scraped daily from Moneyweb, BusinessLive, SENS")
+
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Top movers strip
+    movers = get_top_movers_by_sentiment(today)
+    if movers["most_bullish"]:
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**📈 Most bullish today**")
+            for row in movers["most_bullish"][:4]:
+                score = row["sentiment_mean"]
+                st.markdown(
+                    f"`{row['ticker']}` &nbsp; "
+                    f"{'🟢' if score > 0.2 else '🔵'} **{score:+.3f}** "
+                    f"({row['article_count']} articles)"
+                )
+        with col2:
+            st.markdown("**📉 Most bearish today**")
+            for row in movers["most_bearish"][:4]:
+                score = row["sentiment_mean"]
+                st.markdown(
+                    f"`{row['ticker']}` &nbsp; "
+                    f"🔴 **{score:+.3f}** "
+                    f"({row['article_count']} articles)"
+                )
+
+    st.divider()
+
+    # Historical sentiment for selected ticker
+    history = get_ticker_sentiment_history(selected_ticker, days=30)
+    if history:
+        hist_df = pd.DataFrame(history)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=hist_df["date"],
+            y=hist_df["sentiment_mean"],
+            marker_color=[
+                "#16a34a" if v > 0.05 else
+                "#dc2626" if v < -0.05 else
+                "#6b7280"
+                for v in hist_df["sentiment_mean"]
+            ],
+            name="Daily Sentiment"
+        ))
+        fig.add_hline(y=0, line_dash="dot", line_color="gray")
+        fig.update_layout(
+            title=f"{selected_ticker} — 30-Day Sentiment Signal",
+            yaxis_title="Sentiment Score",
+            template="plotly_white",
+            height=300,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Sample headlines
+        latest = history[-1] if history else {}
+        headlines = latest.get("sample_headlines", [])
+        if headlines:
+            st.caption("Recent headlines driving this score:")
+            for h in headlines:
+                st.markdown(f"• {h}")
+    else:
+        st.info(f"No sentiment data yet for {selected_ticker}. Run the pipeline first.")
+        
