@@ -1,0 +1,57 @@
+# Runs at 18:15 SAST (16:15 UTC) every weekday — 15 min after JSE close
+# GitHub Actions free tier: 2,000 minutes/month. This uses ~5 min/day.
+# Monthly cost: 5 min × 22 trading days = 110 minutes. You have 1,890 left.
+
+name: JSE Daily Sentiment Pipeline
+
+on:
+  schedule:
+    - cron: "15 16 * * 1-5"  # Mon-Fri 16:15 UTC = 18:15 SAST
+  workflow_dispatch:          # Manual trigger from GitHub UI
+    inputs:
+      date:
+        description: "Override date (YYYY-MM-DD, leave blank for today)"
+        required: false
+      dry_run:
+        description: "Dry run (no DB writes)"
+        type: boolean
+        default: false
+
+jobs:
+  sentiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run sentiment pipeline
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          DATE_ARG=""
+          DRY_ARG=""
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            DATE_ARG="--date ${{ github.event.inputs.date }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DRY_ARG="--dry-run"
+          fi
+          python -m sentiment_engine.pipeline $DATE_ARG $DRY_ARG
+
+      - name: Alert on failure
+        if: failure()
+        run: |
+          echo "Pipeline failed — check logs above"
+          # Later: add email/Slack alert here
